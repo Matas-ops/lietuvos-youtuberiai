@@ -1,0 +1,36 @@
+name: Build Docker Images
+
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      # let the other image finish so both failures show up in one run
+      fail-fast: false
+      matrix:
+        project:
+          - YoutubersBackend
+          - YoutubersFrontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: ./${{ matrix.project }}
+          file: ./${{ matrix.project }}/Dockerfile
+          push: false
+          # layer cache per image, so restore and publish only rerun when the project changes
+          cache-from: type=gha,scope=${{ matrix.project }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.project }}
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # the images are built above, this only catches mistakes in compose.yaml
+      - run: docker compose config --quiet
