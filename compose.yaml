@@ -1,0 +1,67 @@
+﻿services:
+
+  backend:
+    build:
+      context: ./YoutubersBackend
+    container_name: youtubers-backend
+    ports:
+      # local access only, public traffic goes through caddy
+      - "127.0.0.1:8081:8080"
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      # set in your shell or in a .env file next to this compose file
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      # the client address in X-Forwarded-For is only taken from the frontend
+      TRUSTED_PROXIES: 172.30.10.11
+
+  frontend:
+    build:
+      context: ./YoutubersFrontend
+    container_name: youtubers-frontend
+    depends_on:
+      - backend
+    ports:
+      # local access only, public traffic goes through caddy
+      - "127.0.0.1:8080:8080"
+    environment:
+      BACKEND_URL: http://youtubers-backend:8080
+      # X-Forwarded-For / X-Forwarded-Proto are only taken from caddy
+      TRUSTED_PROXIES: 172.30.10.10
+    networks:
+      default:
+        ipv4_address: 172.30.10.11
+
+  caddy:
+    image: caddy:2.11-alpine
+    container_name: youtubers-caddy
+    depends_on:
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      # domain to serve, see Caddyfile
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+    networks:
+      default:
+        ipv4_address: 172.30.10.10
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # certificates and the local CA survive restarts
+      - caddy_data:/data
+      - caddy_config:/config
+
+networks:
+  default:
+    ipam:
+      config:
+        # fixed addresses for caddy and the frontend, see TRUSTED_PROXIES;
+        # other containers get addresses from the upper half so they never take one of those
+        - subnet: 172.30.10.0/24
+          gateway: 172.30.10.1
+          ip_range: 172.30.10.128/25
+
+volumes:
+  caddy_data:
+  caddy_config:

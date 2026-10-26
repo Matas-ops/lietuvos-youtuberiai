@@ -1,0 +1,21 @@
+# HTTPS entry point for the whole app.
+#
+# SITE_ADDRESS=localhost   (default) certificate from Caddy's own local CA, for development
+# SITE_ADDRESS=example.com certificate from Let's Encrypt, issued and renewed automatically
+#                          (DNS must point to this server and ports 80/443 must be reachable)
+#
+# Plain HTTP requests are redirected to HTTPS automatically.
+
+{$SITE_ADDRESS:localhost} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	# sets X-Forwarded-For / X-Forwarded-Proto for the frontend
+	reverse_proxy frontend:8080
+}
